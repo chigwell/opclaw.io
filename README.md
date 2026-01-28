@@ -1,3 +1,9 @@
+<div align="center">
+  <a target="_blank" href="https://molt.tech/?utm_source=github&utm_medium=readme">
+   <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&height=200&section=header&text=molt.tech&fontSize=50&fontAlignY=35&animation=fadeIn&fontColor=FFFFFF&descAlignY=55&descAlign=62" alt="molt.tech" width="100%" />
+  </a>
+</div>
+
 This is a Next.js landing page, configured for static export and deployment to Cloudflare Pages via Wrangler.
 
 ## Getting Started
