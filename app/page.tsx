@@ -1,23 +1,77 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { SparklesCore } from "@/components/ui/sparkles";
 
-const TypewriterText = ({ text, speed = 50 }: { text: string; speed?: number }) => {
+interface TypewriterProps {
+  texts: string[];
+  typingSpeed?: number;      // ms per character (default: 70ms for natural feel)
+  delayBetweenTexts?: number; // ms to wait before next text (for future rotation)
+  loop?: boolean;            // whether to loop through texts
+  onComplete?: () => void;   // callback when all texts typed (if not looping)
+}
+
+const Typewriter = ({
+  texts,
+  typingSpeed = 70,
+  delayBetweenTexts = 2000,
+  loop = false,
+  onComplete,
+}: TypewriterProps) => {
   const [displayedText, setDisplayedText] = useState("");
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [textIndex, setTextIndex] = useState(0);
+  const [charIndex, setCharIndex] = useState(0);
+  const [isTyping, setIsTyping] = useState(true);
+  const [isComplete, setIsComplete] = useState(false);
   const [showCursor, setShowCursor] = useState(true);
 
-  useEffect(() => {
-    if (currentIndex < text.length) {
-      const timeout = setTimeout(() => {
-        setDisplayedText((prev) => prev + text[currentIndex]);
-        setCurrentIndex((prev) => prev + 1);
-      }, speed);
-      return () => clearTimeout(timeout);
-    }
-  }, [currentIndex, text, speed]);
+  const currentText = texts[textIndex] || "";
 
+  // Natural typing variation: slight randomness in speed
+  const getTypingDelay = useCallback(() => {
+    // Add ±30% variation for natural feel
+    const variation = typingSpeed * 0.3;
+    return typingSpeed + (Math.random() * variation * 2 - variation);
+  }, [typingSpeed]);
+
+  // Type characters one by one
+  useEffect(() => {
+    if (!isTyping || isComplete) return;
+
+    if (charIndex < currentText.length) {
+      const timeout = setTimeout(() => {
+        setDisplayedText((prev) => prev + currentText[charIndex]);
+        setCharIndex((prev) => prev + 1);
+      }, getTypingDelay());
+      return () => clearTimeout(timeout);
+    } else {
+      // Finished typing current text
+      if (textIndex < texts.length - 1 && loop) {
+        // More texts to show, wait then move to next
+        const timeout = setTimeout(() => {
+          setDisplayedText("");
+          setCharIndex(0);
+          setTextIndex((prev) => prev + 1);
+        }, delayBetweenTexts);
+        return () => clearTimeout(timeout);
+      } else if (loop && texts.length > 1) {
+        // Loop back to first text
+        const timeout = setTimeout(() => {
+          setDisplayedText("");
+          setCharIndex(0);
+          setTextIndex(0);
+        }, delayBetweenTexts);
+        return () => clearTimeout(timeout);
+      } else {
+        // All done, stop
+        setIsTyping(false);
+        setIsComplete(true);
+        onComplete?.();
+      }
+    }
+  }, [charIndex, currentText, textIndex, texts.length, isTyping, isComplete, loop, delayBetweenTexts, getTypingDelay, onComplete]);
+
+  // Cursor blink
   useEffect(() => {
     const cursorInterval = setInterval(() => {
       setShowCursor((prev) => !prev);
@@ -26,9 +80,14 @@ const TypewriterText = ({ text, speed = 50 }: { text: string; speed?: number }) 
   }, []);
 
   return (
-    <span>
+    <span className="inline-block">
       {displayedText}
-      <span className={`${showCursor ? "opacity-100" : "opacity-0"} transition-opacity`}>|</span>
+      <span 
+        className={`inline-block w-[2px] h-[1.1em] bg-neutral-400 ml-1 align-middle transition-opacity duration-100 ${
+          showCursor ? "opacity-100" : "opacity-0"
+        }`}
+        aria-hidden="true"
+      />
     </span>
   );
 };
@@ -37,9 +96,15 @@ export default function Home() {
   const [startTyping, setStartTyping] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setStartTyping(true), 800);
+    // Small delay before starting animation
+    const timer = setTimeout(() => setStartTyping(true), 600);
     return () => clearTimeout(timer);
   }, []);
+
+  // Array of texts - ready for future rotation
+  const taglines = [
+    "Deploy your own molt.bot instance in minutes.",
+  ];
 
   return (
     <main className="h-screen w-screen bg-black flex items-center justify-center overflow-hidden">
@@ -64,14 +129,15 @@ export default function Home() {
         </h1>
 
         {/* Typing Animation Tagline */}
-        <p className="text-neutral-400 text-lg md:text-xl lg:text-2xl max-w-3xl mx-auto h-16 md:h-12">
+        <div className="text-neutral-400 text-lg md:text-xl lg:text-2xl max-w-3xl mx-auto min-h-[2em]">
           {startTyping && (
-            <TypewriterText
-              text="Deploy your own molt.bot instance in minutes."
-              speed={45}
+            <Typewriter
+              texts={taglines}
+              typingSpeed={65}  // ~65ms per char = natural typing pace
+              loop={false}      // Stop after typing once
             />
           )}
-        </p>
+        </div>
 
         {/* Glowing gradient line */}
         <div className="w-40 h-px mx-auto bg-gradient-to-r from-transparent via-indigo-500 to-transparent mt-8" />
