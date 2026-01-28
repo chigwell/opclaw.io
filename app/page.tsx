@@ -3,6 +3,8 @@
 import { motion } from "framer-motion";
 import { Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useEffect, useMemo, useState } from "react";
+import { ShinyButton } from "@/components/ShinyButton";
 
 function ElegantShape({
   className,
@@ -79,6 +81,35 @@ function HeroGeometric({
   title?: string;
   subtitle?: string;
 }) {
+  const [typedText, setTypedText] = useState("");
+  const [isTypingComplete, setIsTypingComplete] = useState(false);
+  const typingText = useMemo(() => subtitle, [subtitle]);
+
+  useEffect(() => {
+    let mounted = true;
+    let index = 0;
+    setTypedText("");
+    setIsTypingComplete(false);
+
+    const typeNext = () => {
+      if (!mounted) return;
+      if (index <= typingText.length) {
+        setTypedText(typingText.slice(0, index));
+        index += 1;
+        const delay = 35 + Math.random() * 35;
+        setTimeout(typeNext, delay);
+      } else {
+        setIsTypingComplete(true);
+      }
+    };
+
+    const startDelay = setTimeout(typeNext, 450);
+    return () => {
+      mounted = false;
+      clearTimeout(startDelay);
+    };
+  }, [typingText]);
+
   const fadeUpVariants = {
     hidden: { opacity: 0, y: 30 },
     visible: (i: number) => ({
@@ -182,8 +213,20 @@ function HeroGeometric({
             animate="visible"
           >
             <p className="text-base sm:text-lg md:text-xl text-white/40 mb-8 leading-relaxed font-light tracking-wide max-w-xl mx-auto px-2">
-              {subtitle}
+              <span className="inline-block">
+                {typedText}
+                <span
+                  className={cn(
+                    "inline-block w-[2px] h-[1.1em] bg-white/40 ml-1 align-middle transition-opacity duration-150",
+                    isTypingComplete ? "opacity-0" : "opacity-100"
+                  )}
+                  aria-hidden="true"
+                />
+              </span>
             </p>
+            <div className="flex justify-center mt-8 md:mt-10">
+              <ShinyButton>Start</ShinyButton>
+            </div>
           </motion.div>
         </div>
       </div>
