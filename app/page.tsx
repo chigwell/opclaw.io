@@ -103,7 +103,7 @@ export default function Home() {
 
   // Array of texts - ready for future rotation
   const taglines = [
-    "Deploy your own molt.bot instance in minutes.",
+    "Get a ready-to-use molt.bot instance in minutes, fully yours.",
   ];
 
   return (
