@@ -868,7 +868,9 @@ function HeroGeometric({
   const badgeText =
     availableCount === null
       ? badge
-      : `${availableCount} molt.bot${availableCount === 1 ? "" : "s"} online`;
+      : `${availableCount} molt.bot${
+          availableCount === 1 ? "" : "s"
+        } available`;
 
   const fadeUpVariants = {
     hidden: { opacity: 0, y: 30 },
