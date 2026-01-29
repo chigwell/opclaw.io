@@ -13,6 +13,10 @@ import {
 import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 
 const AUTH_API_BASE = "https://auth.molt.tech";
+const BILLING_API_BASE = "https://billing.molt.tech";
+const STRIPE_PRICE_ID = "price_1SuvTrCjeNi5bLgNMGVVWZCU";
+const STRIPE_PAYMENT_LINK =
+  "https://buy.stripe.com/3cIaEWdGA3pz4Mq5Mgd7q00";
 const SSH_WS_BASE = "wss://ssh.molt.tech/ws/terminal";
 const AUTH_COOKIE = "molt_google_jwt";
 const AUTH_COOKIE_MAX_AGE = 60 * 30;
@@ -58,6 +62,50 @@ const clearAuthCookie = () => {
 };
 
 type AuthState = "checking" | "unauth" | "authed";
+
+function PaymentView({
+  onBack,
+  status,
+  error,
+}: {
+  onBack: () => void;
+  status: string;
+  error: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-left text-sm text-white/70">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-xs uppercase tracking-[0.3em] text-white/50">
+          Deploy molt.bot
+        </div>
+        <button
+          type="button"
+          onClick={onBack}
+          className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-white/70 transition hover:border-white/30 hover:bg-white/10"
+        >
+          Back
+        </button>
+      </div>
+      <div className="space-y-3">
+        <div className="text-sm text-white/80">
+          Molt.bot VPS (4 vCPU / 8GB RAM) — $10/month
+        </div>
+        <div className="text-[11px] uppercase tracking-[0.2em] text-white/40">
+          {status}
+        </div>
+        <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-xs text-white/60">
+          We opened a secure Stripe checkout in a new tab. Complete the payment
+          there, and we’ll confirm it here automatically.
+        </div>
+        {error ? (
+          <div className="rounded-xl border border-white/10 bg-white/[0.06] px-4 py-2 text-xs text-white/70">
+            {error}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 function TerminalView({
   vpsIp,
@@ -206,7 +254,8 @@ function StartAuthModalContent({
   const [authState, setAuthState] = useState<AuthState>("checking");
   const [email, setEmail] = useState("");
   const [vpsCount, setVpsCount] = useState<number | null>(null);
-  const [view, setView] = useState<"list" | "terminal">("list");
+  const [availableCount, setAvailableCount] = useState<number | null>(null);
+  const [view, setView] = useState<"list" | "terminal" | "payment">("list");
   const [selectedVps, setSelectedVps] = useState<{
     ip: string;
     status: number;
@@ -224,6 +273,17 @@ function StartAuthModalContent({
     }>
   >([]);
   const [message, setMessage] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState(
+    "Waiting for payment confirmation…"
+  );
+  const [paymentError, setPaymentError] = useState("");
+  const [paymentInProgress, setPaymentInProgress] = useState(false);
+  const [provisioningCheck, setProvisioningCheck] = useState(false);
+  const provisioningRef = useRef<number | null>(null);
+  const provisioningAttemptsRef = useRef(0);
+  const paymentOpenedRef = useRef(false);
+  const paymentPollingRef = useRef<number | null>(null);
+  const paymentStoppedRef = useRef(false);
 
   const resetToUnauth = useCallback((msg?: string) => {
     clearAuthCookie();
@@ -297,6 +357,16 @@ function StartAuthModalContent({
         typeof vpsData.count_vps === "number" ? vpsData.count_vps : 0;
       setVpsCount(count);
       onHasInstances(count > 0);
+      if (count > 0) {
+        setAvailableCount(null);
+      }
+      if (count === 0 && view === "terminal") {
+        setView("list");
+        setSelectedVps(null);
+      }
+      if (count > 0 && view === "payment") {
+        setView("list");
+      }
 
       if (count > 0) {
         const listResponse = await fetch(`${AUTH_API_BASE}/list-my-vps`, {
@@ -333,12 +403,149 @@ function StartAuthModalContent({
       onHasInstances(false);
     }
     },
-    [onHasInstances, resetToUnauth]
+    [onHasInstances, resetToUnauth, view]
   );
 
   useEffect(() => {
     verifyAuth();
   }, [verifyAuth]);
+
+  useEffect(() => {
+    if (authState !== "authed" || vpsCount !== 0) return;
+    const fetchAvailable = async () => {
+      try {
+        const response = await fetch(`${AUTH_API_BASE}/available-vps`);
+        if (!response.ok) {
+          setAvailableCount(null);
+          return;
+        }
+        const data = (await response.json()) as { count_vps?: number };
+        setAvailableCount(
+          typeof data.count_vps === "number" ? data.count_vps : null
+        );
+      } catch {
+        setAvailableCount(null);
+      }
+    };
+    fetchAvailable();
+  }, [authState, vpsCount]);
+
+  useEffect(() => {
+    if (!provisioningCheck) return;
+
+    const schedule = () => {
+      provisioningRef.current = window.setTimeout(async () => {
+        await verifyAuth();
+        provisioningAttemptsRef.current += 1;
+        if (vpsCount && vpsCount > 0) {
+          setProvisioningCheck(false);
+          return;
+        }
+        if (provisioningAttemptsRef.current >= 12) {
+          setProvisioningCheck(false);
+          return;
+        }
+        schedule();
+      }, 5000);
+    };
+
+    schedule();
+
+    return () => {
+      if (provisioningRef.current) {
+        window.clearTimeout(provisioningRef.current);
+        provisioningRef.current = null;
+      }
+    };
+  }, [provisioningCheck, verifyAuth, vpsCount]);
+
+  const stopPaymentPolling = useCallback(() => {
+    paymentStoppedRef.current = true;
+    if (paymentPollingRef.current) {
+      window.clearTimeout(paymentPollingRef.current);
+      paymentPollingRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!paymentInProgress) {
+      stopPaymentPolling();
+      paymentOpenedRef.current = false;
+      return;
+    }
+
+    paymentStoppedRef.current = false;
+    setPaymentError("");
+    setPaymentStatus("Waiting for payment confirmation…");
+
+    const token = getCookieValue(AUTH_COOKIE);
+    if (!token) {
+      resetToUnauth("Your session expired. Please sign in again.");
+      setPaymentError("Please sign in again to continue.");
+      setPaymentStatus("Unauthorized");
+      setPaymentInProgress(false);
+      setView("list");
+      return;
+    }
+
+    if (!paymentOpenedRef.current) {
+      paymentOpenedRef.current = true;
+      const encodedEmail = encodeURIComponent(email || "");
+      const paymentUrl = `${STRIPE_PAYMENT_LINK}?prefilled_email=${encodedEmail}`;
+      window.open(paymentUrl, "_blank", "noopener,noreferrer");
+    }
+
+    const poll = async () => {
+      if (paymentStoppedRef.current) return;
+      try {
+        const response = await fetch(`${BILLING_API_BASE}/check-status`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.status === 401) {
+          resetToUnauth("Your session expired. Please sign in again.");
+          setPaymentError("Please sign in again to continue.");
+          setPaymentStatus("Unauthorized");
+          setPaymentInProgress(false);
+          setView("list");
+          return;
+        }
+        if (!response.ok) {
+          setPaymentError("We couldn't check payment status. Retrying…");
+          setPaymentStatus("Waiting for payment confirmation…");
+          return;
+        }
+        const data = (await response.json()) as { ok?: boolean };
+        if (data.ok) {
+          setPaymentStatus("Payment confirmed");
+          paymentStoppedRef.current = true;
+          setPaymentInProgress(false);
+          setView("list");
+          verifyAuth();
+          setMessage("Payment confirmed. Provisioning your instance now.");
+          setProvisioningCheck(true);
+          provisioningAttemptsRef.current = 0;
+        }
+      } catch {
+        setPaymentError("We couldn't reach the billing service. Retrying…");
+        setPaymentStatus("Waiting for payment confirmation…");
+      }
+    };
+
+    const schedule = () => {
+      if (paymentStoppedRef.current) return;
+      paymentPollingRef.current = window.setTimeout(async () => {
+        await poll();
+        schedule();
+      }, 4000);
+    };
+
+    poll();
+    schedule();
+
+    return () => {
+      stopPaymentPolling();
+    };
+  }, [email, paymentInProgress, resetToUnauth, stopPaymentPolling, verifyAuth]);
 
   return (
     <div className="relative flex flex-col gap-6 text-center">
@@ -347,7 +554,11 @@ function StartAuthModalContent({
           molt.bot access
         </p>
         <h2 className="text-2xl font-semibold">
-          {authState === "authed" ? `Hi, ${email}` : "Sign in to continue"}
+          {authState === "authed"
+            ? `Hi, ${
+                email.length > 22 ? `${email.slice(0, 20)}..` : email
+              }`
+            : "Sign in to continue"}
         </h2>
         <p className="text-sm text-white/60">
           {authState === "authed"
@@ -378,9 +589,47 @@ function StartAuthModalContent({
       ) : null}
 
       {authState === "authed" && vpsCount === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-gradient-to-r from-indigo-500/20 via-white/5 to-rose-500/20 px-5 py-4 text-sm text-white/80">
-          Deploy your first molt.bot instance for just $10/month
-        </div>
+        <>
+          {view === "list" ? (
+            <div className="rounded-2xl border border-white/10 bg-gradient-to-r from-indigo-500/20 via-white/5 to-rose-500/20 px-5 py-4 text-sm text-white/80">
+              {availableCount === 0 ? (
+                <div className="flex flex-col gap-3">
+                  <div>
+                    All molt.bot instances are currently reserved. Leave your
+                    email with us and we’ll let you know when new capacity is
+                    available.
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <div>
+                    Deploy your first molt.bot instance for just $10/month.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentInProgress(true);
+                      setView("payment");
+                    }}
+                    className="inline-flex w-full items-center justify-center rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs uppercase tracking-[0.35em] text-white/80 transition hover:border-white/30 hover:bg-white/20"
+                  >
+                    Continue to payment
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : null}
+          {view === "payment" ? (
+            <PaymentView
+              onBack={() => {
+                setPaymentInProgress(false);
+                setView("list");
+              }}
+              status={paymentStatus}
+              error={paymentError}
+            />
+          ) : null}
+        </>
       ) : null}
 
       {authState === "authed" && typeof vpsCount === "number" && vpsCount > 0 ? (
