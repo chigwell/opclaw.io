@@ -540,6 +540,11 @@ function StartAuthModalContent({
           paymentStoppedRef.current = true;
           setPaymentInProgress(false);
           setView("list");
+          if (typeof window !== "undefined") {
+            const url = new URL(window.location.href);
+            url.searchParams.set("success", "1");
+            window.history.replaceState({}, "", url.toString());
+          }
           verifyAuth();
           setMessage("Payment confirmed. Provisioning your instance now.");
           setProvisioningCheck(true);
