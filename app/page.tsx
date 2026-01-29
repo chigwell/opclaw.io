@@ -282,6 +282,7 @@ function StartAuthModalContent({
   const provisioningRef = useRef<number | null>(null);
   const provisioningAttemptsRef = useRef(0);
   const notifySentRef = useRef(false);
+  const authNotifySentRef = useRef(false);
   const paymentOpenedRef = useRef(false);
   const paymentPollingRef = useRef<number | null>(null);
   const paymentStoppedRef = useRef(false);
@@ -338,6 +339,15 @@ function StartAuthModalContent({
 
       setEmail(meData.user_email);
       setAuthState("authed");
+      if (!authNotifySentRef.current) {
+        authNotifySentRef.current = true;
+        const token = getCookieValue(AUTH_COOKIE);
+        if (token) {
+          fetch(`${AUTH_API_BASE}/notifications-set`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }).catch(() => null);
+        }
+      }
 
       const vpsResponse = await fetch(`${AUTH_API_BASE}/check-my-vps`, {
         headers: { Authorization: `Bearer ${token}` },
