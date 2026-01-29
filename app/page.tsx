@@ -278,11 +278,14 @@ function StartAuthModalContent({
   );
   const [paymentError, setPaymentError] = useState("");
   const [paymentInProgress, setPaymentInProgress] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState("");
   const [provisioningCheck, setProvisioningCheck] = useState(false);
   const provisioningRef = useRef<number | null>(null);
   const provisioningAttemptsRef = useRef(0);
   const notifySentRef = useRef(false);
   const authNotifySentRef = useRef(false);
+  const pendingPollingRef = useRef<number | null>(null);
   const paymentOpenedRef = useRef(false);
   const paymentPollingRef = useRef<number | null>(null);
   const paymentStoppedRef = useRef(false);
@@ -370,6 +373,8 @@ function StartAuthModalContent({
       onHasInstances(count > 0);
       if (count > 0) {
         setAvailableCount(null);
+        setPendingStatus(false);
+        setPendingMessage("");
       }
       if (count === 0 && view === "terminal") {
         setView("list");
@@ -487,6 +492,55 @@ function StartAuthModalContent({
     }
   }, []);
 
+  const startPendingPolling = useCallback(() => {
+    if (pendingPollingRef.current) return;
+    const token = getCookieValue(AUTH_COOKIE);
+    if (!token) return;
+    const poll = async () => {
+      try {
+        const response = await fetch(`${BILLING_API_BASE}/pending-status`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!response.ok) return;
+        const data = (await response.json()) as { pending?: boolean };
+        if (!data.pending) {
+          setPendingStatus(false);
+          setPendingMessage("");
+          if (pendingPollingRef.current) {
+            window.clearTimeout(pendingPollingRef.current);
+            pendingPollingRef.current = null;
+          }
+          verifyAuth();
+          return;
+        }
+      } catch {
+        return;
+      }
+      pendingPollingRef.current = window.setTimeout(poll, 10000);
+    };
+    pendingPollingRef.current = window.setTimeout(poll, 10000);
+  }, [verifyAuth]);
+
+  useEffect(() => {
+    if (authState !== "authed") return;
+    const token = getCookieValue(AUTH_COOKIE);
+    if (!token) return;
+    fetch(`${BILLING_API_BASE}/pending-status`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: { pending?: boolean } | null) => {
+        if (data?.pending) {
+          setPendingStatus(true);
+          setPendingMessage(
+            "Your VPS is being prepared. We’ll notify you by email when it’s ready (usually within 8 hours)."
+          );
+          startPendingPolling();
+        }
+      })
+      .catch(() => null);
+  }, [authState, startPendingPolling]);
+
   useEffect(() => {
     if (!paymentInProgress) {
       stopPaymentPolling();
@@ -530,6 +584,18 @@ function StartAuthModalContent({
           return;
         }
         if (!response.ok) {
+          if (response.status === 409) {
+            setPaymentStatus("Payment confirmed");
+            paymentStoppedRef.current = true;
+            setPaymentInProgress(false);
+            setView("list");
+            setPendingStatus(true);
+            setPendingMessage(
+              "Your VPS is being prepared. We’ll notify you by email when it’s ready (usually within 8 hours)."
+            );
+            startPendingPolling();
+            return;
+          }
           setPaymentError("We couldn't check payment status. Retrying…");
           setPaymentStatus("Waiting for payment confirmation…");
           return;
@@ -617,7 +683,11 @@ function StartAuthModalContent({
         <>
           {view === "list" ? (
             <div className="rounded-2xl border border-white/10 bg-gradient-to-r from-indigo-500/20 via-white/5 to-rose-500/20 px-5 py-4 text-sm text-white/80">
-              {availableCount === 0 ? (
+              {pendingStatus ? (
+                <div className="flex flex-col gap-3">
+                  <div>{pendingMessage}</div>
+                </div>
+              ) : availableCount === 0 ? (
                 <div className="flex flex-col gap-3">
                   <div>
                     All molt.bot instances are currently reserved. We'll let you know when new capacity is
