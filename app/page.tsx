@@ -1003,6 +1003,12 @@ function HeroGeometric({
       </div>
 
       <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-transparent to-[#030303]/80 pointer-events-none" />
+      <a
+        href="mailto:support@molt.tech"
+        className="fixed bottom-6 right-6 z-20 text-sm text-white/70 transition hover:text-white"
+      >
+        support@molt.tech
+      </a>
     </div>
   );
 }
