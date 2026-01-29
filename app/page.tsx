@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ShinyButton } from "@/components/ShinyButton";
 import {
   WarpDialog,
@@ -13,6 +13,7 @@ import {
 import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 
 const AUTH_API_BASE = "https://auth.molt.tech";
+const SSH_WS_BASE = "wss://ssh.molt.tech/ws/terminal";
 const AUTH_COOKIE = "molt_google_jwt";
 const AUTH_COOKIE_MAX_AGE = 60 * 30;
 
@@ -58,20 +59,190 @@ const clearAuthCookie = () => {
 
 type AuthState = "checking" | "unauth" | "authed";
 
-function StartAuthModalContent() {
+function TerminalView({
+  vpsIp,
+  onBack,
+}: {
+  vpsIp: string;
+  onBack: () => void;
+}) {
+  const terminalRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const termRef = useRef<any>(null);
+  const [status, setStatus] = useState("Connecting…");
+
+  useEffect(() => {
+    const ensureCss = () => {
+      if (document.getElementById("xterm-css")) return;
+      const link = document.createElement("link");
+      link.id = "xterm-css";
+      link.rel = "stylesheet";
+      link.href = "https://cdn.jsdelivr.net/npm/xterm/css/xterm.css";
+      document.head.appendChild(link);
+    };
+
+    const ensureScript = (onReady: () => void) => {
+      if ((window as any).Terminal) {
+        onReady();
+        return;
+      }
+
+      if (document.getElementById("xterm-js")) {
+        document
+          .getElementById("xterm-js")
+          ?.addEventListener("load", onReady, { once: true });
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.id = "xterm-js";
+      script.src = "https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js";
+      script.async = true;
+      script.onload = onReady;
+      document.body.appendChild(script);
+    };
+
+    ensureCss();
+
+    ensureScript(() => {
+      const Terminal = (window as any).Terminal;
+      if (!Terminal || !terminalRef.current) return;
+
+      const term = new Terminal({
+        cursorBlink: true,
+        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas",
+        fontSize: 13,
+        theme: {
+          background: "#0b0b0c",
+          foreground: "#e8e8ee",
+        },
+      });
+      term.open(terminalRef.current);
+      termRef.current = term;
+
+      const token = getCookieValue(AUTH_COOKIE);
+      if (!token) {
+        term.write("No auth token found. Please sign in again.\r\n");
+        setStatus("Unauthorized");
+        return;
+      }
+
+      const wsUrl = `${SSH_WS_BASE}?vps_ip=${encodeURIComponent(
+        vpsIp
+      )}&token=${encodeURIComponent(token)}`;
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        setStatus("Connected");
+      };
+      ws.onmessage = (event) => {
+        term.write(event.data);
+      };
+      ws.onerror = () => {
+        setStatus("Connection failed");
+        term.write("\r\nConnection failed.\r\n");
+      };
+      ws.onclose = () => {
+        setStatus("Disconnected");
+        term.write("\r\nConnection closed.\r\n");
+      };
+
+      term.onData((data: string) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(data);
+        }
+      });
+    });
+
+    return () => {
+      wsRef.current?.close();
+      termRef.current?.dispose?.();
+      wsRef.current = null;
+      termRef.current = null;
+    };
+  }, [vpsIp]);
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left text-sm text-white/70">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-xs uppercase tracking-[0.3em] text-white/50">
+          Terminal — {vpsIp}
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] uppercase tracking-[0.2em] text-white/40">
+            {status}
+          </span>
+          <button
+            type="button"
+            onClick={onBack}
+            className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-white/70 transition hover:border-white/30 hover:bg-white/10"
+          >
+            Back
+          </button>
+        </div>
+      </div>
+      <div className="h-[420px] w-full overflow-hidden rounded-xl border border-white/10 bg-[#0b0b0c]">
+        <div ref={terminalRef} className="h-full w-full" />
+      </div>
+      <p className="mt-3 text-[11px] text-white/40">
+        If the terminal doesn’t load, please check your access or try again.
+      </p>
+    </div>
+  );
+}
+
+function StartAuthModalContent({
+  onHasInstances,
+}: {
+  onHasInstances: (hasInstances: boolean) => void;
+}) {
   const [authState, setAuthState] = useState<AuthState>("checking");
   const [email, setEmail] = useState("");
   const [vpsCount, setVpsCount] = useState<number | null>(null);
+  const [view, setView] = useState<"list" | "terminal">("list");
+  const [selectedVps, setSelectedVps] = useState<{
+    ip: string;
+    status: number;
+    code: string;
+    allocated_from: string | null;
+    allocated_till: string | null;
+  } | null>(null);
+  const [vpsList, setVpsList] = useState<
+    Array<{
+      ip: string;
+      status: number;
+      code: string;
+      allocated_from: string | null;
+      allocated_till: string | null;
+    }>
+  >([]);
   const [message, setMessage] = useState("");
 
-  const verifyAuth = useCallback(async (tokenOverride?: string) => {
-    const token = tokenOverride ?? getCookieValue(AUTH_COOKIE);
-    if (!token) {
-      setAuthState("unauth");
-      setEmail("");
-      setVpsCount(null);
-      return;
-    }
+  const resetToUnauth = useCallback((msg?: string) => {
+    clearAuthCookie();
+    setAuthState("unauth");
+    setEmail("");
+    setVpsCount(null);
+    setView("list");
+    setSelectedVps(null);
+    setVpsList([]);
+    if (msg) setMessage(msg);
+  }, []);
+
+  const verifyAuth = useCallback(
+    async (tokenOverride?: string) => {
+      const token = tokenOverride ?? getCookieValue(AUTH_COOKIE);
+      if (!token) {
+        setAuthState("unauth");
+        setEmail("");
+        setVpsCount(null);
+        setView("list");
+        setSelectedVps(null);
+        setVpsList([]);
+        onHasInstances(false);
+        return;
+      }
 
     setAuthState("checking");
     setMessage("");
@@ -82,11 +253,8 @@ function StartAuthModalContent() {
       });
 
       if (!meResponse.ok) {
-        clearAuthCookie();
-        setAuthState("unauth");
-        setEmail("");
-        setVpsCount(null);
-        setMessage("Your session expired. Please sign in again.");
+        resetToUnauth("Your session expired. Please sign in again.");
+        onHasInstances(false);
         return;
       }
 
@@ -96,11 +264,8 @@ function StartAuthModalContent() {
       };
 
       if (!meData?.is_auth || !meData.user_email) {
-        clearAuthCookie();
-        setAuthState("unauth");
-        setEmail("");
-        setVpsCount(null);
-        setMessage("We couldn't verify your account. Please try again.");
+        resetToUnauth("We couldn't verify your account. Please try again.");
+        onHasInstances(false);
         return;
       }
 
@@ -112,20 +277,58 @@ function StartAuthModalContent() {
       });
 
       if (!vpsResponse.ok) {
+        if (vpsResponse.status === 401) {
+          resetToUnauth("Your session expired. Please sign in again.");
+          return;
+        }
         setVpsCount(null);
         setMessage("We couldn't load your instances right now.");
         return;
       }
 
       const vpsData = (await vpsResponse.json()) as { count_vps?: number };
-      setVpsCount(typeof vpsData.count_vps === "number" ? vpsData.count_vps : 0);
+      const count =
+        typeof vpsData.count_vps === "number" ? vpsData.count_vps : 0;
+      setVpsCount(count);
+      onHasInstances(count > 0);
+
+      if (count > 0) {
+        const listResponse = await fetch(`${AUTH_API_BASE}/list-my-vps`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!listResponse.ok) {
+          if (listResponse.status === 401) {
+            resetToUnauth("Your session expired. Please sign in again.");
+            onHasInstances(false);
+            return;
+          }
+          setMessage("We couldn't load your instances right now.");
+          setVpsList([]);
+          return;
+        }
+
+        const listData = (await listResponse.json()) as {
+          vps?: Array<{
+            ip: string;
+            status: number;
+            code: string;
+            allocated_from: string | null;
+            allocated_till: string | null;
+          }>;
+        };
+
+        setVpsList(Array.isArray(listData.vps) ? listData.vps : []);
+      } else {
+        setVpsList([]);
+      }
     } catch {
-      setAuthState("unauth");
-      setEmail("");
-      setVpsCount(null);
-      setMessage("We couldn't reach the auth service. Please try again.");
+      resetToUnauth("We couldn't reach the auth service. Please try again.");
+      onHasInstances(false);
     }
-  }, []);
+    },
+    [onHasInstances, resetToUnauth]
+  );
 
   useEffect(() => {
     verifyAuth();
@@ -175,9 +378,74 @@ function StartAuthModalContent() {
       ) : null}
 
       {authState === "authed" && typeof vpsCount === "number" && vpsCount > 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 text-sm text-white/70">
-          Your molt.bot instances will appear here soon.
-        </div>
+        <>
+          {view === "list" ? (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left text-sm text-white/70">
+              <div className="mb-3 text-xs uppercase tracking-[0.3em] text-white/50">
+                Your instances
+              </div>
+              <div className="overflow-hidden rounded-xl border border-white/10">
+                <table className="w-full text-xs text-white/70">
+                  <thead className="bg-white/[0.06] text-[11px] uppercase tracking-[0.2em] text-white/50">
+                    <tr>
+                      <th className="px-3 py-2 text-left">IP</th>
+                      <th className="px-3 py-2 text-left">Status</th>
+                      <th className="px-3 py-2 text-left">Code</th>
+                      <th className="px-3 py-2 text-left">From</th>
+                      <th className="px-3 py-2 text-left">Till</th>
+                      <th className="px-3 py-2 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 bg-white/[0.02]">
+                    {vpsList.length === 0 ? (
+                      <tr>
+                        <td className="px-3 py-3 text-white/50" colSpan={6}>
+                          Loading your instances…
+                        </td>
+                      </tr>
+                    ) : (
+                      vpsList.map((vps, index) => (
+                        <tr key={`${vps.ip}-${index}`}>
+                          <td className="px-3 py-2 font-medium text-white/80">
+                            {vps.ip}
+                          </td>
+                          <td className="px-3 py-2">
+                            {vps.status === 1 ? "Active" : "Pending"}
+                          </td>
+                          <td className="px-3 py-2">{vps.code}</td>
+                          <td className="px-3 py-2">
+                            {vps.allocated_from ?? "—"}
+                          </td>
+                          <td className="px-3 py-2">
+                            {vps.allocated_till ?? "—"}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedVps(vps);
+                                setView("terminal");
+                              }}
+                              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-white/70 transition hover:border-white/30 hover:bg-white/10"
+                            >
+                              Connect
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
+          {view === "terminal" && selectedVps ? (
+            <TerminalView
+              vpsIp={selectedVps.ip}
+              onBack={() => setView("list")}
+            />
+          ) : null}
+        </>
       ) : null}
 
       {authState === "authed" && vpsCount === null ? (
@@ -273,6 +541,10 @@ function HeroGeometric({
 }) {
   const [typedText, setTypedText] = useState("");
   const [isTypingComplete, setIsTypingComplete] = useState(false);
+  const [hasInstances, setHasInstances] = useState(false);
+  const handleHasInstances = useCallback((value: boolean) => {
+    setHasInstances(value);
+  }, []);
   const typingText = useMemo(() => subtitle, [subtitle]);
 
   useEffect(() => {
@@ -419,8 +691,10 @@ function HeroGeometric({
                 <WarpDialogTrigger asChild>
                   <ShinyButton>Start</ShinyButton>
                 </WarpDialogTrigger>
-                <WarpDialogContent>
-                  <StartAuthModalContent />
+                <WarpDialogContent className={hasInstances ? "max-w-3xl" : ""}>
+                  <StartAuthModalContent
+                    onHasInstances={handleHasInstances}
+                  />
                 </WarpDialogContent>
               </WarpDialog>
             </div>
