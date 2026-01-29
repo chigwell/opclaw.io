@@ -281,6 +281,7 @@ function StartAuthModalContent({
   const [provisioningCheck, setProvisioningCheck] = useState(false);
   const provisioningRef = useRef<number | null>(null);
   const provisioningAttemptsRef = useRef(0);
+  const notifySentRef = useRef(false);
   const paymentOpenedRef = useRef(false);
   const paymentPollingRef = useRef<number | null>(null);
   const paymentStoppedRef = useRef(false);
@@ -420,9 +421,18 @@ function StartAuthModalContent({
           return;
         }
         const data = (await response.json()) as { count_vps?: number };
-        setAvailableCount(
-          typeof data.count_vps === "number" ? data.count_vps : null
-        );
+        const count =
+          typeof data.count_vps === "number" ? data.count_vps : null;
+        setAvailableCount(count);
+        if (count === 0 && !notifySentRef.current) {
+          notifySentRef.current = true;
+          const token = getCookieValue(AUTH_COOKIE);
+          if (token) {
+            fetch(`${AUTH_API_BASE}/notifications-set`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }).catch(() => null);
+          }
+        }
       } catch {
         setAvailableCount(null);
       }
@@ -595,8 +605,7 @@ function StartAuthModalContent({
               {availableCount === 0 ? (
                 <div className="flex flex-col gap-3">
                   <div>
-                    All molt.bot instances are currently reserved. Leave your
-                    email with us and we’ll let you know when new capacity is
+                    All molt.bot instances are currently reserved. We'll let you know when new capacity is
                     available.
                   </div>
                 </div>
@@ -786,7 +795,7 @@ function ElegantShape({
 }
 
 function HeroGeometric({
-  badge = "10 molt.bots online",
+  badge = "molt.bots online",
   title = "Deploy your bot. Keep control.",
   subtitle = "Get a ready-to-use molt.bot instance in minutes, fully yours.",
 }: {
@@ -797,6 +806,7 @@ function HeroGeometric({
   const [typedText, setTypedText] = useState("");
   const [isTypingComplete, setIsTypingComplete] = useState(false);
   const [hasInstances, setHasInstances] = useState(false);
+  const [availableCount, setAvailableCount] = useState<number | null>(null);
   const handleHasInstances = useCallback((value: boolean) => {
     setHasInstances(value);
   }, []);
@@ -826,6 +836,39 @@ function HeroGeometric({
       clearTimeout(startDelay);
     };
   }, [typingText]);
+
+  useEffect(() => {
+    const fetchAvailable = async () => {
+      try {
+        const response = await fetch(`${AUTH_API_BASE}/available-vps`);
+        if (!response.ok) {
+          setAvailableCount(null);
+          return;
+        }
+        const data = (await response.json()) as { count_vps?: number };
+        setAvailableCount(
+          typeof data.count_vps === "number" ? data.count_vps : null
+        );
+      } catch {
+        setAvailableCount(null);
+      }
+    };
+    fetchAvailable();
+  }, []);
+
+  const indicatorClass =
+    availableCount === null
+      ? "fill-white/40"
+      : availableCount === 0
+        ? "fill-red-500/80"
+        : availableCount < 3
+          ? "fill-orange-400/80"
+          : "fill-green-500/80";
+
+  const badgeText =
+    availableCount === null
+      ? badge
+      : `${availableCount} molt.bot${availableCount === 1 ? "" : "s"} online`;
 
   const fadeUpVariants = {
     hidden: { opacity: 0, y: 30 },
@@ -900,9 +943,9 @@ function HeroGeometric({
             animate="visible"
             className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] mb-8 md:mb-12"
           >
-            <Circle className="h-2 w-2 fill-green-500/80" />
+            <Circle className={cn("h-2 w-2", indicatorClass)} />
             <span className="text-sm text-white/60 tracking-wide">
-              {badge}
+              {badgeText}
             </span>
           </motion.div>
 
