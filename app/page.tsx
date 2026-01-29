@@ -3,8 +3,198 @@
 import { motion } from "framer-motion";
 import { Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ShinyButton } from "@/components/ShinyButton";
+import {
+  WarpDialog,
+  WarpDialogContent,
+  WarpDialogTrigger,
+} from "@/components/WarpDialog";
+import { GoogleAuthButton } from "@/components/GoogleAuthButton";
+
+const AUTH_API_BASE = "https://auth.molt.tech";
+const AUTH_COOKIE = "molt_google_jwt";
+const AUTH_COOKIE_MAX_AGE = 60 * 30;
+
+const getCookieValue = (name: string) => {
+  if (typeof document === "undefined") return "";
+  const prefix = `${name}=`;
+  const parts = document.cookie.split("; ");
+  for (const part of parts) {
+    if (part.startsWith(prefix)) {
+      return decodeURIComponent(part.slice(prefix.length));
+    }
+  }
+  return "";
+};
+
+const setAuthCookie = (token: string) => {
+  if (typeof document === "undefined") return;
+  const isMoltDomain = window.location.hostname.endsWith("molt.tech");
+  const cookieParts = [
+    `${AUTH_COOKIE}=${encodeURIComponent(token)}`,
+    "path=/",
+    `max-age=${AUTH_COOKIE_MAX_AGE}`,
+    "samesite=lax",
+  ];
+  if (isMoltDomain) cookieParts.push("domain=.molt.tech");
+  if (window.location.protocol === "https:") cookieParts.push("secure");
+  document.cookie = cookieParts.join("; ");
+};
+
+const clearAuthCookie = () => {
+  if (typeof document === "undefined") return;
+  const isMoltDomain = window.location.hostname.endsWith("molt.tech");
+  const cookieParts = [
+    `${AUTH_COOKIE}=`,
+    "path=/",
+    "max-age=0",
+    "samesite=lax",
+  ];
+  if (isMoltDomain) cookieParts.push("domain=.molt.tech");
+  if (window.location.protocol === "https:") cookieParts.push("secure");
+  document.cookie = cookieParts.join("; ");
+};
+
+type AuthState = "checking" | "unauth" | "authed";
+
+function StartAuthModalContent() {
+  const [authState, setAuthState] = useState<AuthState>("checking");
+  const [email, setEmail] = useState("");
+  const [vpsCount, setVpsCount] = useState<number | null>(null);
+  const [message, setMessage] = useState("");
+
+  const verifyAuth = useCallback(async (tokenOverride?: string) => {
+    const token = tokenOverride ?? getCookieValue(AUTH_COOKIE);
+    if (!token) {
+      setAuthState("unauth");
+      setEmail("");
+      setVpsCount(null);
+      return;
+    }
+
+    setAuthState("checking");
+    setMessage("");
+
+    try {
+      const meResponse = await fetch(`${AUTH_API_BASE}/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!meResponse.ok) {
+        clearAuthCookie();
+        setAuthState("unauth");
+        setEmail("");
+        setVpsCount(null);
+        setMessage("Your session expired. Please sign in again.");
+        return;
+      }
+
+      const meData = (await meResponse.json()) as {
+        is_auth?: boolean;
+        user_email?: string;
+      };
+
+      if (!meData?.is_auth || !meData.user_email) {
+        clearAuthCookie();
+        setAuthState("unauth");
+        setEmail("");
+        setVpsCount(null);
+        setMessage("We couldn't verify your account. Please try again.");
+        return;
+      }
+
+      setEmail(meData.user_email);
+      setAuthState("authed");
+
+      const vpsResponse = await fetch(`${AUTH_API_BASE}/check-my-vps`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!vpsResponse.ok) {
+        setVpsCount(null);
+        setMessage("We couldn't load your instances right now.");
+        return;
+      }
+
+      const vpsData = (await vpsResponse.json()) as { count_vps?: number };
+      setVpsCount(typeof vpsData.count_vps === "number" ? vpsData.count_vps : 0);
+    } catch {
+      setAuthState("unauth");
+      setEmail("");
+      setVpsCount(null);
+      setMessage("We couldn't reach the auth service. Please try again.");
+    }
+  }, []);
+
+  useEffect(() => {
+    verifyAuth();
+  }, [verifyAuth]);
+
+  return (
+    <div className="relative flex flex-col gap-6 text-center">
+      <div className="space-y-2">
+        <p className="text-xs uppercase tracking-[0.35em] text-white/50">
+          molt.bot access
+        </p>
+        <h2 className="text-2xl font-semibold">
+          {authState === "authed" ? `Hi, ${email}` : "Sign in to continue"}
+        </h2>
+        <p className="text-sm text-white/60">
+          {authState === "authed"
+            ? "Manage your molt.bot instances from one secure place."
+            : "Connect your Google account to create and manage your molt.bot instance."}
+        </p>
+      </div>
+
+      {message ? (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-xs text-white/70">
+          {message}
+        </div>
+      ) : null}
+
+      {authState === "checking" ? (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white/70">
+          Checking your access…
+        </div>
+      ) : null}
+
+      {authState !== "authed" ? (
+        <GoogleAuthButton
+          onCredential={(credential) => {
+            setAuthCookie(credential);
+            verifyAuth(credential);
+          }}
+        />
+      ) : null}
+
+      {authState === "authed" && vpsCount === 0 ? (
+        <div className="rounded-2xl border border-white/10 bg-gradient-to-r from-indigo-500/20 via-white/5 to-rose-500/20 px-5 py-4 text-sm text-white/80">
+          Deploy your first molt.bot instance for just $10/month
+        </div>
+      ) : null}
+
+      {authState === "authed" && typeof vpsCount === "number" && vpsCount > 0 ? (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 text-sm text-white/70">
+          Your molt.bot instances will appear here soon.
+        </div>
+      ) : null}
+
+      {authState === "authed" && vpsCount === null ? (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-4 text-sm text-white/70">
+          We’re preparing your instance overview.
+        </div>
+      ) : null}
+
+      {authState !== "authed" ? (
+        <p className="text-[11px] text-white/40">
+          By continuing you agree to our terms and confirm that you’ve read our
+          privacy policy.
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 function ElegantShape({
   className,
@@ -225,7 +415,14 @@ function HeroGeometric({
               </span>
             </p>
             <div className="flex justify-center mt-8 md:mt-10">
-              <ShinyButton>Start</ShinyButton>
+              <WarpDialog>
+                <WarpDialogTrigger asChild>
+                  <ShinyButton>Start</ShinyButton>
+                </WarpDialogTrigger>
+                <WarpDialogContent>
+                  <StartAuthModalContent />
+                </WarpDialogContent>
+              </WarpDialog>
             </div>
           </motion.div>
         </div>
