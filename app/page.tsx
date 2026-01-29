@@ -69,6 +69,7 @@ function TerminalView({
   const terminalRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const termRef = useRef<any>(null);
+  const initializedRef = useRef(false);
   const [status, setStatus] = useState("Connecting…");
 
   useEffect(() => {
@@ -105,8 +106,12 @@ function TerminalView({
     ensureCss();
 
     ensureScript(() => {
+      if (initializedRef.current) return;
       const Terminal = (window as any).Terminal;
       if (!Terminal || !terminalRef.current) return;
+
+      initializedRef.current = true;
+      terminalRef.current.innerHTML = "";
 
       const term = new Terminal({
         cursorBlink: true,
@@ -156,6 +161,7 @@ function TerminalView({
     });
 
     return () => {
+      initializedRef.current = false;
       wsRef.current?.close();
       termRef.current?.dispose?.();
       wsRef.current = null;
@@ -182,7 +188,7 @@ function TerminalView({
           </button>
         </div>
       </div>
-      <div className="h-[420px] w-full overflow-hidden rounded-xl border border-white/10 bg-[#0b0b0c]">
+      <div className="h-[560px] w-full overflow-hidden rounded-xl border border-white/10 bg-[#0b0b0c]">
         <div ref={terminalRef} className="h-full w-full" />
       </div>
       <p className="mt-3 text-[11px] text-white/40">
