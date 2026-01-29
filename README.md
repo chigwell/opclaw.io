@@ -4,7 +4,7 @@
   </a>
 </div>
 
-This is a Next.js landing page, configured for static export and deployment to Cloudflare Pages via Wrangler.
+This is the landing page for https://molt.tech/, used to deploy https://molt.bot/ instances remotely and privately. Each VPS includes 4 vCPU cores, 8 GB RAM, 150 GB SSD, and a 200 Mbit/s port, starting at $10/month.
 
 ## Getting Started
 
