@@ -733,8 +733,8 @@ function StartAuthModalContent({
               <div className="mb-3 text-xs uppercase tracking-[0.3em] text-white/50">
                 Your instances
               </div>
-              <div className="overflow-hidden rounded-xl border border-white/10">
-                <table className="w-full text-xs text-white/70">
+              <div className="overflow-x-auto rounded-xl border border-white/10">
+                <table className="min-w-[680px] w-full text-xs text-white/70">
                   <thead className="bg-white/[0.06] text-[11px] uppercase tracking-[0.2em] text-white/50">
                     <tr>
                       <th className="px-3 py-2 text-left">IP</th>
