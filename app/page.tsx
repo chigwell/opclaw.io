@@ -118,6 +118,7 @@ function TerminalView({
   const wsRef = useRef<WebSocket | null>(null);
   const termRef = useRef<any>(null);
   const initializedRef = useRef(false);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [status, setStatus] = useState("Connecting…");
 
   useEffect(() => {
@@ -164,7 +165,9 @@ function TerminalView({
       const term = new Terminal({
         cursorBlink: true,
         fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas",
-        fontSize: 13,
+        fontSize: 12,
+        lineHeight: 1.1,
+        scrollback: 200,
         theme: {
           background: "#0b0b0c",
           foreground: "#e8e8ee",
@@ -172,6 +175,21 @@ function TerminalView({
       });
       term.open(terminalRef.current);
       termRef.current = term;
+
+      const resizeToFit = () => {
+        if (!terminalRef.current) return;
+        const { clientWidth, clientHeight } = terminalRef.current;
+        const lineHeight = 12 * 1.1;
+        const rows = Math.max(
+          10,
+          Math.floor((clientHeight - 8) / lineHeight) - 2
+        );
+        const cols = Math.max(40, Math.floor(clientWidth / 8));
+        term.resize(cols, rows);
+      };
+      resizeToFit();
+      resizeObserverRef.current = new ResizeObserver(resizeToFit);
+      resizeObserverRef.current.observe(terminalRef.current);
 
       const token = getCookieValue(AUTH_COOKIE);
       if (!token) {
@@ -210,6 +228,8 @@ function TerminalView({
 
     return () => {
       initializedRef.current = false;
+      resizeObserverRef.current?.disconnect?.();
+      resizeObserverRef.current = null;
       wsRef.current?.close();
       termRef.current?.dispose?.();
       wsRef.current = null;
@@ -236,8 +256,8 @@ function TerminalView({
           </button>
         </div>
       </div>
-      <div className="h-[560px] w-full overflow-hidden rounded-xl border border-white/10 bg-[#0b0b0c]">
-        <div ref={terminalRef} className="h-full w-full" />
+      <div className="h-[70vh] w-full overflow-hidden rounded-xl border border-white/10 bg-[#0b0b0c]">
+        <div ref={terminalRef} className="h-full w-full min-w-[1000px]" />
       </div>
       <p className="mt-3 text-[11px] text-white/40">
         If the terminal doesn’t load, please check your access or try again.
@@ -640,23 +660,25 @@ function StartAuthModalContent({
 
   return (
     <div className="relative flex flex-col gap-6 text-center">
-      <div className="space-y-2">
-        <p className="text-xs uppercase tracking-[0.35em] text-white/50">
-          molt.bot access
-        </p>
-        <h2 className="text-2xl font-semibold">
-          {authState === "authed"
-            ? `Hi, ${
-                email.length > 22 ? `${email.slice(0, 20)}..` : email
-              }`
-            : "Sign in to continue"}
-        </h2>
-        <p className="text-sm text-white/60">
-          {authState === "authed"
-            ? "Manage your molt.bot instances from one secure place."
-            : "Connect your Google account to create and manage your molt.bot instance."}
-        </p>
-      </div>
+      {view !== "terminal" ? (
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-[0.35em] text-white/50">
+            molt.bot access
+          </p>
+          <h2 className="text-2xl font-semibold">
+            {authState === "authed"
+              ? `Hi, ${
+                  email.length > 22 ? `${email.slice(0, 20)}..` : email
+                }`
+              : "Sign in to continue"}
+          </h2>
+          <p className="text-sm text-white/60">
+            {authState === "authed"
+              ? "Manage your molt.bot instances from one secure place."
+              : "Connect your Google account to create and manage your molt.bot instance."}
+          </p>
+        </div>
+      ) : null}
 
       {message ? (
         <div className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-xs text-white/70">
