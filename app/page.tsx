@@ -346,7 +346,7 @@ function StartAuthModalContent({
         authNotifySentRef.current = true;
         const token = getCookieValue(AUTH_COOKIE);
         if (token) {
-          fetch(`${AUTH_API_BASE}/notifications-set`, {
+          fetch(`${AUTH_API_BASE}/notifications-set?message_type=1`, {
             headers: { Authorization: `Bearer ${token}` },
           }).catch(() => null);
         }
@@ -443,7 +443,7 @@ function StartAuthModalContent({
           notifySentRef.current = true;
           const token = getCookieValue(AUTH_COOKIE);
           if (token) {
-            fetch(`${AUTH_API_BASE}/notifications-set`, {
+            fetch(`${AUTH_API_BASE}/notifications-set?message_type=3`, {
               headers: { Authorization: `Bearer ${token}` },
             }).catch(() => null);
           }
@@ -701,10 +701,16 @@ function StartAuthModalContent({
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setPaymentInProgress(true);
-                      setView("payment");
-                    }}
+                  onClick={() => {
+                    const token = getCookieValue(AUTH_COOKIE);
+                    if (token) {
+                      fetch(`${AUTH_API_BASE}/notifications-set?message_type=2`, {
+                        headers: { Authorization: `Bearer ${token}` },
+                      }).catch(() => null);
+                    }
+                    setPaymentInProgress(true);
+                    setView("payment");
+                  }}
                     className="inline-flex w-full items-center justify-center rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs uppercase tracking-[0.35em] text-white/80 transition hover:border-white/30 hover:bg-white/20"
                   >
                     Continue to payment
