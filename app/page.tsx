@@ -786,6 +786,16 @@ function StartAuthModalContent({
                   </tbody>
                 </table>
               </div>
+              <div className="mt-4 flex justify-end">
+                <a
+                  href="https://billing.stripe.com/p/login/3cIaEWdGA3pz4Mq5Mgd7q00"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs uppercase tracking-[0.25em] text-white/60 transition hover:text-white"
+                >
+                  Manage subscription
+                </a>
+              </div>
             </div>
           ) : null}
           {view === "terminal" && selectedVps ? (
