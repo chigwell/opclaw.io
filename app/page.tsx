@@ -1156,6 +1156,14 @@ function HeroGeometric({
 }
 
 export default function Home() {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const host = window.location.hostname.toLowerCase();
+    if (host === "molt.tech" || host === "www.molt.tech") {
+      window.location.replace("https://opclaw.io/");
+    }
+  }, []);
+
   return (
     <main>
       <HeroGeometric />
