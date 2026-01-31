@@ -123,3 +123,20 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee var(--duration, 40s) linear infinite;
+}
+
+.marquee-hover-pause:hover .animate-marquee {
+  animation-play-state: paused;
+}

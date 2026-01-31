@@ -5,11 +5,14 @@ import { Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ShinyButton } from "@/components/ShinyButton";
+import { TestimonialsSection } from "@/components/blocks/testimonials-with-marquee";
+import StarOnGithub from "@/components/ui/button-github";
 import {
   WarpDialog,
   WarpDialogContent,
   WarpDialogTrigger,
 } from "@/components/WarpDialog";
+import testimonialsData from "@/app/testimonials.json";
 import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 
 const AUTH_API_BASE = "https://auth.opclaw.io";
@@ -1167,7 +1170,51 @@ function HeroGeometric({
   );
 }
 
+function StarOnGithubSection() {
+  return (
+    <section className="bg-black">
+      <div className="mx-auto flex w-full justify-center px-4 py-16">
+        <StarOnGithub />
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
+  const [shuffledTestimonials, setShuffledTestimonials] = useState(
+    () => [...testimonialsData]
+  );
+
+  const testimonials = useMemo(
+    () =>
+      shuffledTestimonials.map((item) => {
+        const handle = item.author.trim();
+        const displayHandle = handle.startsWith("@") ? handle : `@${handle}`;
+        const safeHandle = encodeURIComponent(handle.replace(/^@/, ""));
+        return {
+          author: {
+            name: handle,
+            handle: displayHandle,
+            avatar: `https://unavatar.io/x/${safeHandle}`,
+          },
+          text: item.quote,
+          href: item.url,
+        };
+      }),
+    [shuffledTestimonials]
+  );
+
+  useEffect(() => {
+    setShuffledTestimonials((current) => {
+      const items = [...current];
+      for (let i = items.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [items[i], items[j]] = [items[j], items[i]];
+      }
+      return items;
+    });
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const host = window.location.hostname.toLowerCase();
@@ -1179,6 +1226,12 @@ export default function Home() {
   return (
     <main>
       <HeroGeometric />
+      <TestimonialsSection
+        title="Trusted by developers worldwide"
+        description="Join thousands of developers who are already building the future with OpenClaw."
+        testimonials={testimonials}
+      />
+      <StarOnGithubSection />
     </main>
   );
 }
