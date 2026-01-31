@@ -8,8 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "build:cf": "next build",
-    "preview:cf": "wrangler pages dev out --project-name opclaw-landing",
-    "deploy:cf": "wrangler pages deploy out --project-name opclaw-landing"
+    "preview:cf": "wrangler pages dev out --project-name molt-tech-landing",
+    "deploy:cf": "wrangler pages deploy out --project-name molt-tech-landing"
   },
   "dependencies": {
     "@tsparticles/engine": "^3.9.1",
