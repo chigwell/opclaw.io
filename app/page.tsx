@@ -63,6 +63,13 @@ const clearAuthCookie = () => {
 
 type AuthState = "checking" | "unauth" | "authed";
 
+const trackLogin = (method: string) => {
+  if (typeof window === "undefined") return;
+  const gtag = (window as unknown as { gtag?: (...args: any[]) => void }).gtag;
+  if (typeof gtag !== "function") return;
+  gtag("event", "login", { method });
+};
+
 function PaymentView({
   onBack,
   status,
@@ -304,6 +311,7 @@ function StartAuthModalContent({
   const provisioningRef = useRef<number | null>(null);
   const provisioningAttemptsRef = useRef(0);
   const noCapacityNotifySentRef = useRef(false);
+  const authAnalyticsSentRef = useRef(false);
   const authNotifySentRef = useRef(false);
   const pendingPollingRef = useRef<number | null>(null);
   const paymentOpenedRef = useRef(false);
@@ -370,6 +378,10 @@ function StartAuthModalContent({
             headers: { Authorization: `Bearer ${token}` },
           }).catch(() => null);
         }
+      }
+      if (!authAnalyticsSentRef.current) {
+        authAnalyticsSentRef.current = true;
+        trackLogin("Google");
       }
 
       const vpsResponse = await fetch(`${AUTH_API_BASE}/check-my-vps`, {
