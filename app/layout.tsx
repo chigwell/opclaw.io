@@ -14,12 +14,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "molt.tech | Transform. Evolve. Transcend.",
-  description: "molt.tech - Your next evolution in technology. Transform your digital presence with cutting-edge solutions.",
-  keywords: ["molt", "technology", "digital transformation", "evolution"],
-  authors: [{ name: "molt.tech" }],
+  title: "OpClaw.io | Transform. Evolve. Transcend.",
+  description:
+    "OpClaw.io - Your next evolution in technology. Transform your digital presence with cutting-edge solutions.",
+  keywords: ["opclaw", "technology", "digital transformation", "evolution"],
+  authors: [{ name: "OpClaw.io" }],
   openGraph: {
-    title: "molt.tech | Transform. Evolve. Transcend.",
+    title: "OpClaw.io | Transform. Evolve. Transcend.",
     description: "Your next evolution in technology.",
     type: "website",
   },
@@ -35,7 +36,7 @@ export default function RootLayout({
       <head>
         <Script
           async
-          src="https://www.googletagmanager.com/gtag/js?id=G-YMJQZDCNM1"
+          src="https://www.googletagmanager.com/gtag/js?id=G-5RJVJ6YLK3"
           strategy="afterInteractive"
         />
         <Script id="gtag-init" strategy="afterInteractive">

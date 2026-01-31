@@ -1,5 +1,5 @@
 {
-  "name": "molt.tech",
+  "name": "opclaw.io",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -8,8 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "build:cf": "next build",
-    "preview:cf": "wrangler pages dev out --project-name molt-tech-landing",
-    "deploy:cf": "wrangler pages deploy out --project-name molt-tech-landing"
+    "preview:cf": "wrangler pages dev out --project-name opclaw-landing",
+    "deploy:cf": "wrangler pages deploy out --project-name opclaw-landing"
   },
   "dependencies": {
     "@tsparticles/engine": "^3.9.1",

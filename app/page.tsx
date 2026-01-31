@@ -12,13 +12,13 @@ import {
 } from "@/components/WarpDialog";
 import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 
-const AUTH_API_BASE = "https://auth.molt.tech";
-const BILLING_API_BASE = "https://billing.molt.tech";
+const AUTH_API_BASE = "https://auth.opclaw.io";
+const BILLING_API_BASE = "https://billing.opclaw.io";
 const STRIPE_PRICE_ID = "price_1SuvTrCjeNi5bLgNMGVVWZCU";
 const STRIPE_PAYMENT_LINK =
   "https://buy.stripe.com/3cIaEWdGA3pz4Mq5Mgd7q00";
-const SSH_WS_BASE = "wss://ssh.molt.tech/ws/terminal";
-const AUTH_COOKIE = "molt_google_jwt";
+const SSH_WS_BASE = "wss://ssh.opclaw.io/ws/terminal";
+const AUTH_COOKIE = "opclaw_google_jwt";
 const AUTH_COOKIE_MAX_AGE = 60 * 30;
 
 const getCookieValue = (name: string) => {
@@ -35,28 +35,28 @@ const getCookieValue = (name: string) => {
 
 const setAuthCookie = (token: string) => {
   if (typeof document === "undefined") return;
-  const isMoltDomain = window.location.hostname.endsWith("molt.tech");
+  const isOpClawDomain = window.location.hostname.endsWith("opclaw.io");
   const cookieParts = [
     `${AUTH_COOKIE}=${encodeURIComponent(token)}`,
     "path=/",
     `max-age=${AUTH_COOKIE_MAX_AGE}`,
     "samesite=lax",
   ];
-  if (isMoltDomain) cookieParts.push("domain=.molt.tech");
+  if (isOpClawDomain) cookieParts.push("domain=.opclaw.io");
   if (window.location.protocol === "https:") cookieParts.push("secure");
   document.cookie = cookieParts.join("; ");
 };
 
 const clearAuthCookie = () => {
   if (typeof document === "undefined") return;
-  const isMoltDomain = window.location.hostname.endsWith("molt.tech");
+  const isOpClawDomain = window.location.hostname.endsWith("opclaw.io");
   const cookieParts = [
     `${AUTH_COOKIE}=`,
     "path=/",
     "max-age=0",
     "samesite=lax",
   ];
-  if (isMoltDomain) cookieParts.push("domain=.molt.tech");
+  if (isOpClawDomain) cookieParts.push("domain=.opclaw.io");
   if (window.location.protocol === "https:") cookieParts.push("secure");
   document.cookie = cookieParts.join("; ");
 };
@@ -76,7 +76,7 @@ function PaymentView({
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-left text-sm text-white/70">
       <div className="mb-3 flex items-center justify-between">
         <div className="text-xs uppercase tracking-[0.3em] text-white/50">
-          Deploy molt.bot
+          Deploy OpenClaw
         </div>
         <button
           type="button"
@@ -88,7 +88,7 @@ function PaymentView({
       </div>
       <div className="space-y-3">
         <div className="text-sm text-white/80">
-          Molt.bot VPS (4 vCPU / 8GB RAM) — $10/month
+          OpenClaw VPS (4 vCPU / 8GB RAM) — $10/month
         </div>
         <div className="text-[11px] uppercase tracking-[0.2em] text-white/40">
           {status}
@@ -682,7 +682,7 @@ function StartAuthModalContent({
       {view !== "terminal" ? (
         <div className="space-y-2">
           <p className="text-xs uppercase tracking-[0.35em] text-white/50">
-            molt.bot access
+            OpenClaw access
           </p>
           <h2 className="text-2xl font-semibold">
             {authState === "authed"
@@ -693,8 +693,8 @@ function StartAuthModalContent({
           </h2>
           <p className="text-sm text-white/60">
             {authState === "authed"
-              ? "Manage your molt.bot instances from one secure place."
-              : "Connect your Google account to create and manage your molt.bot instance."}
+              ? "Manage your OpenClaw instances from one secure place."
+              : "Connect your Google account to create and manage your OpenClaw instance."}
           </p>
         </div>
       ) : null}
@@ -731,14 +731,14 @@ function StartAuthModalContent({
               ) : availableCount === 0 ? (
                 <div className="flex flex-col gap-3">
                   <div>
-                    All molt.bot instances are currently reserved. We'll let you know when new capacity is
+                    All OpenClaw instances are currently reserved. We'll let you know when new capacity is
                     available.
                   </div>
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
                   <div>
-                    Deploy your first molt.bot instance for just $10/month.
+                    Deploy your first OpenClaw instance for just $10/month.
                   </div>
                   <button
                     type="button"
@@ -937,9 +937,9 @@ function ElegantShape({
 }
 
 function HeroGeometric({
-  badge = "molt.bots online",
+  badge = "OpenClaw instances online",
   title = "Deploy your bot. Keep control.",
-  subtitle = "Get a ready-to-use molt.bot instance in minutes, fully yours.",
+  subtitle = "Get a ready-to-use OpenClaw instance in minutes, fully yours.",
 }: {
   badge?: string;
   title?: string;
@@ -1010,7 +1010,7 @@ function HeroGeometric({
   const badgeText =
     availableCount === null
       ? badge
-      : `${availableCount} molt.bot${
+      : `${availableCount} OpenClaw instance${
           availableCount === 1 ? "" : "s"
         } available`;
 
@@ -1146,10 +1146,10 @@ function HeroGeometric({
 
       <div className="absolute inset-0 bg-gradient-to-t from-[#030303] via-transparent to-[#030303]/80 pointer-events-none" />
       <a
-        href="mailto:support@molt.tech"
+        href="mailto:support@opclaw.io"
         className="fixed bottom-6 right-6 z-20 text-sm text-white/70 transition hover:text-white"
       >
-        support@molt.tech
+        support@opclaw.io
       </a>
     </div>
   );
