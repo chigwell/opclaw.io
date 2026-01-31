@@ -303,7 +303,7 @@ function StartAuthModalContent({
   const [provisioningCheck, setProvisioningCheck] = useState(false);
   const provisioningRef = useRef<number | null>(null);
   const provisioningAttemptsRef = useRef(0);
-  const notifySentRef = useRef(false);
+  const noCapacityNotifySentRef = useRef(false);
   const authNotifySentRef = useRef(false);
   const pendingPollingRef = useRef<number | null>(null);
   const paymentOpenedRef = useRef(false);
@@ -459,20 +459,17 @@ function StartAuthModalContent({
         const count =
           typeof data.count_vps === "number" ? data.count_vps : null;
         setAvailableCount(count);
-        if (count === 0 && !notifySentRef.current) {
-          notifySentRef.current = true;
-          const token = getCookieValue(AUTH_COOKIE);
-          if (token) {
-            fetch(`${AUTH_API_BASE}/notifications-set?message_type=3`, {
-              headers: { Authorization: `Bearer ${token}` },
-            }).catch(() => null);
-          }
-        }
       } catch {
         setAvailableCount(null);
       }
     };
     fetchAvailable();
+  }, [authState, vpsCount]);
+
+  useEffect(() => {
+    if (authState !== "authed" || (typeof vpsCount === "number" && vpsCount > 0)) {
+      noCapacityNotifySentRef.current = false;
+    }
   }, [authState, vpsCount]);
 
   useEffect(() => {
@@ -605,6 +602,15 @@ function StartAuthModalContent({
         }
         if (!response.ok) {
           if (response.status === 409) {
+            let payload: { error?: string; pending?: boolean } | null = null;
+            try {
+              payload = (await response.json()) as {
+                error?: string;
+                pending?: boolean;
+              };
+            } catch {
+              payload = null;
+            }
             setPaymentStatus("Payment confirmed");
             paymentStoppedRef.current = true;
             setPaymentInProgress(false);
@@ -614,6 +620,19 @@ function StartAuthModalContent({
               "Your VPS is being prepared. We’ll notify you by email when it’s ready (usually within 8 hours)."
             );
             startPendingPolling();
+            if (
+              payload?.pending &&
+              payload?.error === "No available VPS" &&
+              !noCapacityNotifySentRef.current
+            ) {
+              noCapacityNotifySentRef.current = true;
+              const token = getCookieValue(AUTH_COOKIE);
+              if (token) {
+                fetch(`${AUTH_API_BASE}/notifications-set?message_type=3`, {
+                  headers: { Authorization: `Bearer ${token}` },
+                }).catch(() => null);
+              }
+            }
             return;
           }
           setPaymentError("We couldn't check payment status. Retrying…");
