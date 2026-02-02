@@ -49,7 +49,7 @@ export function ShinyButton({
           --shiny-cta-highlight: lab(75 6.97 -37.84);
           --shiny-cta-highlight-subtle: #fea4b0;
           --animation: gradient-angle linear infinite;
-          --duration: 3s;
+          --duration: 6s;
           --shadow-size: 2px;
           --transition: 800ms cubic-bezier(0.25, 1, 0.5, 1);
 
