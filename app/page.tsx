@@ -877,8 +877,25 @@ function StartAuthModalContent({
 
       {authState !== "authed" ? (
         <p className="text-[11px] text-white/40">
-          By continuing you agree to our terms and confirm that you’ve read our
-          privacy policy.
+          By continuing you agree to our{" "}
+          <a
+            href="https://github.com/chigwell/opclaw.io/blob/main/TERMS.md"
+            target="_blank"
+            rel="noreferrer"
+            className="text-white/70 underline underline-offset-4 hover:text-white"
+          >
+            terms
+          </a>{" "}
+          and confirm that you’ve read our{" "}
+          <a
+            href="https://github.com/chigwell/opclaw.io/blob/main/PRIVACY.md"
+            target="_blank"
+            rel="noreferrer"
+            className="text-white/70 underline underline-offset-4 hover:text-white"
+          >
+            privacy policy
+          </a>
+          .
         </p>
       ) : null}
     </div>
