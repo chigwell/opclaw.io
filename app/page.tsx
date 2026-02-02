@@ -1149,7 +1149,9 @@ export default function Home() {
           author: {
             name: handle,
             handle: displayHandle,
-            avatar: `https://unavatar.io/x/${safeHandle}`,
+            avatar: `https://wsrv.nl/?url=${encodeURIComponent(
+              `https://unavatar.io/x/${safeHandle}`
+            )}`,
           },
           text: item.quote,
           href: item.url,
