@@ -1228,7 +1228,7 @@ export default function Home() {
       <HeroGeometric />
       <TestimonialsSection
         title="Trusted by developers worldwide"
-        description="Join thousands of developers who are already building the future with OpenClaw."
+        description="Join thousands of developers who are already building the future with OpenClaw. Here's what people are saying about OpenClaw.ai:"
         testimonials={testimonials}
       />
       <StarOnGithubSection />
