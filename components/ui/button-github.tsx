@@ -30,7 +30,7 @@ export default function StarOnGithub() {
           ></path>
         </svg>
         <span className="font-display inline-block font-medium tracking-wider text-black tabular-nums dark:text-white">
-          129,348
+          146,233
         </span>
       </div>
     </a>
