@@ -6,12 +6,14 @@ interface ShinyButtonProps {
   children: React.ReactNode;
   onClick?: () => void;
   className?: string;
+  id?: string;
 }
 
 export function ShinyButton({
   children,
   onClick,
   className = "",
+  id,
 }: ShinyButtonProps) {
   return (
     <>
@@ -199,7 +201,7 @@ export function ShinyButton({
         }
       `}</style>
 
-      <button className={`shiny-cta ${className}`} onClick={onClick}>
+      <button id={id} className={`shiny-cta ${className}`} onClick={onClick}>
         <span>{children}</span>
       </button>
     </>

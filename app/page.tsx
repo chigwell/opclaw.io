@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ShinyButton } from "@/components/ShinyButton";
 import { TestimonialsSection } from "@/components/blocks/testimonials-with-marquee";
 import StarOnGithub from "@/components/ui/button-github";
+import FeatureSection from "@/components/ui/stack-feature-section";
 import {
   WarpDialog,
   WarpDialogContent,
@@ -1104,7 +1105,7 @@ function HeroGeometric({
           <div className="flex justify-center mt-4">
             <WarpDialog>
               <WarpDialogTrigger asChild>
-                <ShinyButton>Start</ShinyButton>
+                <ShinyButton id="start-button">Start</ShinyButton>
               </WarpDialogTrigger>
               <WarpDialogContent className={hasInstances ? "max-w-3xl" : ""}>
                 <StartAuthModalContent onHasInstances={handleHasInstances} />
@@ -1186,6 +1187,15 @@ export default function Home() {
         title="Trusted by developers worldwide"
         description="Join thousands of developers who are already building the future with OpenClaw. Here's what people are saying about OpenClaw.ai:"
         testimonials={testimonials}
+      />
+      <FeatureSection
+        onTryIt={() => {
+          if (typeof window === "undefined") return;
+          const startButton = document.getElementById("start-button");
+          if (startButton instanceof HTMLButtonElement) {
+            startButton.click();
+          }
+        }}
       />
       <StarOnGithubSection />
     </main>
