@@ -196,6 +196,7 @@ function TerminalView({
         );
         const cols = Math.max(40, Math.floor(clientWidth / 8));
         term.resize(cols, rows);
+        term.scrollToBottom();
       };
       resizeToFit();
       resizeObserverRef.current = new ResizeObserver(resizeToFit);
@@ -217,8 +218,13 @@ function TerminalView({
       ws.onopen = () => {
         setStatus("Connected");
       };
+      const scrollToBottom = () => {
+        // Keep cursor/output visible even after long output.
+        term.scrollToBottom();
+      };
+
       ws.onmessage = (event) => {
-        term.write(event.data);
+        term.write(event.data, scrollToBottom);
       };
       ws.onerror = () => {
         setStatus("Connection failed");
@@ -233,6 +239,7 @@ function TerminalView({
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(data);
         }
+        scrollToBottom();
       });
     });
 
